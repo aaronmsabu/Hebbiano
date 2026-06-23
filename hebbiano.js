@@ -121,6 +121,11 @@ var allowCascade = false;
 var cascadeDepth = 0;
 var MAX_CASCADE  = 4;
 
+var lastTapTime  = 0;
+var tapDeltas    = [];
+var metronomeRunning = false;
+var nextTickTime = 0;
+
 var CAPTIONS = {
   learn:  'Cells that fire together wire together \u2014 play some notes and watch the network learn. Click the grid to play it back.',
   create: 'The network is your instrument \u2014 play a note and let learned connections generate melodies. Teach it patterns, then jam.'
@@ -189,6 +194,40 @@ function play(noteIndex) {
   }
 
   lastPlayTime[noteIndex] = currentMs;
+
+  // --- Auto-Tempo Tracking (Tap Tempo) ---
+  if (!autoPlayRunning) { // Don't track tempo from auto-generated notes
+    var delayFromLast = currentMs - lastTapTime;
+    if (delayFromLast > 2000) {
+      // Gap too large, reset tracking
+      tapDeltas = [];
+    } else if (delayFromLast > 200) {
+      // Between 200ms (300 BPM) and 2000ms (30 BPM)
+      tapDeltas.push(delayFromLast);
+      if (tapDeltas.length > 4) tapDeltas.shift(); // Keep last 4 taps
+      
+      if (tapDeltas.length >= 2) {
+        var sumDeltas = 0;
+        for (var k = 0; k < tapDeltas.length; k++) sumDeltas += tapDeltas[k];
+        var avgDelay = sumDeltas / tapDeltas.length;
+        
+        // Convert to BPM (assuming quarter notes)
+        var newBpm = Math.round(60000 / avgDelay);
+        if (newBpm >= 60 && newBpm <= 240) {
+          tempoBpm = newBpm;
+          
+          // Update UI if the element exists
+          var bpmInput = document.getElementById('tempo-slider');
+          var bpmVal = document.getElementById('tempo-val');
+          if (bpmInput && bpmVal) {
+            bpmInput.value = tempoBpm;
+            bpmVal.textContent = tempoBpm;
+          }
+        }
+      }
+    }
+    lastTapTime = currentMs;
+  }
 
   // --- Generative Playback (Create Mode) ---
   if (currentMode === 'create') {
@@ -1132,11 +1171,13 @@ function createCreatePanel() {
 
   var bpmVal = document.createElement('span');
   bpmVal.className = 'slider-value';
+  bpmVal.id = 'tempo-val';
   bpmVal.textContent = tempoBpm;
 
   var bpmInput = document.createElement('input');
   bpmInput.type = 'range';
   bpmInput.className = 'slider';
+  bpmInput.id = 'tempo-slider';
   bpmInput.min = 60;
   bpmInput.max = 240;
   bpmInput.step = 1;
@@ -1194,6 +1235,29 @@ function createCreatePanel() {
   autoRow.appendChild(autoToggle);
   autoRow.appendChild(autoLabel);
   playSection.appendChild(autoRow);
+
+  // Metronome toggle
+  var metronomeRow = document.createElement('div');
+  metronomeRow.className = 'toggle-row';
+  
+  var metronomeLabel = document.createElement('span');
+  metronomeLabel.textContent = 'Metronome click';
+  
+  var metronomeToggle = document.createElement('input');
+  metronomeToggle.type = 'checkbox';
+  metronomeToggle.className = 'create-toggle';
+  metronomeToggle.checked = metronomeRunning;
+  metronomeToggle.addEventListener('change', function () {
+    metronomeRunning = this.checked;
+    if (metronomeRunning) {
+      ensureAudio();
+      nextTickTime = audioCtx.currentTime; // start immediately
+    }
+  });
+  
+  metronomeRow.appendChild(metronomeToggle);
+  metronomeRow.appendChild(metronomeLabel);
+  playSection.appendChild(metronomeRow);
 
   panel.appendChild(playSection);
 
@@ -1295,6 +1359,35 @@ function runAutoPlay() {
   autoPlayTimeout = setTimeout(runAutoPlay, quarterNoteMs);
 }
 
+function scheduleMetronome() {
+  if (!metronomeRunning || !audioCtx) return;
+  
+  // Lookahead window: 100ms
+  while (nextTickTime < audioCtx.currentTime + 0.1) {
+    // Schedule a click
+    var osc = audioCtx.createOscillator();
+    var env = audioCtx.createGain();
+    
+    // Woodblock/click sound
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, nextTickTime); // high ping
+    osc.frequency.exponentialRampToValueAtTime(200, nextTickTime + 0.05); // quick drop
+    
+    env.gain.setValueAtTime(0, nextTickTime);
+    env.gain.linearRampToValueAtTime(0.5, nextTickTime + 0.005); // quick attack
+    env.gain.exponentialRampToValueAtTime(0.001, nextTickTime + 0.05); // fast decay
+    
+    osc.connect(env);
+    env.connect(masterGain);
+    
+    osc.start(nextTickTime);
+    osc.stop(nextTickTime + 0.05);
+    
+    // Advance to next beat (quarter note)
+    nextTickTime += (60.0 / tempoBpm);
+  }
+}
+
 // ==========================================
 // MODE SWITCHING
 // ==========================================
@@ -1325,6 +1418,7 @@ function tick() {
   updateGridInfo();
   updateEquation();
   checkExperiments();
+  scheduleMetronome();
   requestAnimationFrame(tick);
 }
 
