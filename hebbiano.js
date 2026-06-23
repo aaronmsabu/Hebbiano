@@ -5,11 +5,19 @@
 // ==========================================
 
 // === TUNING CONSTANTS (edit these to adjust behavior) ===
-const ETA         = 0.015;    // Hebbian learning rate
-const SHORT_DECAY = 0.95;     // Activity trace decay per frame (~230ms half-life at 60fps)
-const LONG_DECAY  = 0.9998;   // Weight decay per frame (~58s half-life at 60fps)
-const COINCIDENCE_WINDOW = 600; // ms — window for pulse animation trigger
+var ETA         = 0.015;    // Hebbian learning rate
+var SHORT_DECAY = 0.95;     // Activity trace decay per frame (~230ms half-life at 60fps)
+var LONG_DECAY  = 0.9998;   // Weight decay per frame (~58s half-life at 60fps)
+var COINCIDENCE_WINDOW = 600; // ms — window for pulse animation trigger
 const DISPLAY_LERP = 0.12;   // Smoothing factor for display weight interpolation
+
+// Defaults for reset
+var DEFAULTS = {
+  ETA: 0.015,
+  SHORT_DECAY: 0.95,
+  LONG_DECAY: 0.9998,
+  COINCIDENCE_WINDOW: 600
+};
 
 // === LAYOUT CONSTANTS ===
 const N          = 16;        // Number of notes (fixed topology)
@@ -586,6 +594,109 @@ function saveSnapshot() {
 }
 
 // ==========================================
+// LEARN PANEL — Parameter Sliders
+// ==========================================
+
+var SLIDER_DEFS = [
+  { key: 'ETA',                label: '\u03B7 (learning rate)',       min: 0.001, max: 0.05,   step: 0.001, fmt: function (v) { return v.toFixed(3); }  },
+  { key: 'SHORT_DECAY',       label: 'Short decay',              min: 0.80,  max: 0.99,   step: 0.01,  fmt: function (v) { return v.toFixed(2); }  },
+  { key: 'LONG_DECAY',        label: 'Long decay',               min: 0.9990, max: 0.9999, step: 0.0001, fmt: function (v) { return v.toFixed(4); } },
+  { key: 'COINCIDENCE_WINDOW', label: 'Coincidence window (ms)', min: 100,   max: 1200,   step: 50,    fmt: function (v) { return v + 'ms'; }      },
+];
+
+var sliderInputs = {}; // key → input element
+var sliderValues = {}; // key → value display element
+
+function getParam(key) {
+  switch (key) {
+    case 'ETA': return ETA;
+    case 'SHORT_DECAY': return SHORT_DECAY;
+    case 'LONG_DECAY': return LONG_DECAY;
+    case 'COINCIDENCE_WINDOW': return COINCIDENCE_WINDOW;
+  }
+}
+
+function setParam(key, val) {
+  switch (key) {
+    case 'ETA': ETA = val; break;
+    case 'SHORT_DECAY': SHORT_DECAY = val; break;
+    case 'LONG_DECAY': LONG_DECAY = val; break;
+    case 'COINCIDENCE_WINDOW': COINCIDENCE_WINDOW = val; break;
+  }
+}
+
+function createLearnPanel() {
+  var panel = document.getElementById('learn-panel');
+
+  // — Parameter sliders section —
+  var section = document.createElement('div');
+  section.className = 'panel-section';
+
+  var heading = document.createElement('div');
+  heading.className = 'panel-heading';
+  heading.textContent = 'Parameters';
+  section.appendChild(heading);
+
+  SLIDER_DEFS.forEach(function (def) {
+    var row = document.createElement('div');
+    row.className = 'slider-row';
+
+    var label = document.createElement('label');
+    label.className = 'slider-label';
+    label.textContent = def.label;
+
+    var val = document.createElement('span');
+    val.className = 'slider-value';
+    val.textContent = def.fmt(getParam(def.key));
+    sliderValues[def.key] = val;
+
+    var input = document.createElement('input');
+    input.type = 'range';
+    input.className = 'slider';
+    input.min = def.min;
+    input.max = def.max;
+    input.step = def.step;
+    input.value = getParam(def.key);
+    sliderInputs[def.key] = input;
+
+    // Closure to capture def
+    (function (d) {
+      input.addEventListener('input', function () {
+        var v = parseFloat(this.value);
+        setParam(d.key, v);
+        sliderValues[d.key].textContent = d.fmt(v);
+      });
+    })(def);
+
+    row.appendChild(label);
+    row.appendChild(val);
+    row.appendChild(input);
+    section.appendChild(row);
+  });
+
+  // Reset defaults button
+  var resetBtn = document.createElement('button');
+  resetBtn.className = 'panel-btn';
+  resetBtn.textContent = 'Reset defaults';
+  resetBtn.addEventListener('click', function () {
+    Object.keys(DEFAULTS).forEach(function (key) {
+      setParam(key, DEFAULTS[key]);
+      if (sliderInputs[key]) {
+        sliderInputs[key].value = DEFAULTS[key];
+      }
+      SLIDER_DEFS.forEach(function (d) {
+        if (d.key === key && sliderValues[key]) {
+          sliderValues[key].textContent = d.fmt(DEFAULTS[key]);
+        }
+      });
+    });
+  });
+  section.appendChild(resetBtn);
+
+  panel.appendChild(section);
+}
+
+// ==========================================
 // MODE SWITCHING
 // ==========================================
 
@@ -635,6 +746,7 @@ function init() {
 
   // Build UI
   createPiano();
+  createLearnPanel();
   setupGridInteraction();
   setupKeyboard();
   initMIDI();
