@@ -21,7 +21,7 @@ body {
 }
 
 #app {
-  max-width: 680px;
+  max-width: 720px;
   width: 100%;
   text-align: center;
 }
@@ -48,6 +48,81 @@ h1 {
   line-height: 1.5;
   max-width: 520px;
   margin: 0 auto;
+}
+
+/* --- Mode Toggle --- */
+
+#mode-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 18px;
+}
+
+.mode-btn {
+  background: #0e0e16;
+  color: #555568;
+  border: 1px solid #252530;
+  padding: 7px 28px;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.mode-btn:first-child {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.mode-btn:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.mode-btn.active {
+  background: #1a2438;
+  color: #8ab0d4;
+  border-color: #2a4060;
+}
+
+.mode-btn:not(.active):hover {
+  background: #141420;
+  color: #7778a0;
+}
+
+/* --- Mode Panels --- */
+
+.mode-panel {
+  text-align: left;
+  max-width: 580px;
+  margin: 0 auto 18px;
+  padding: 16px 20px;
+  background: #0c0c14;
+  border: 1px solid #1e1e28;
+  border-radius: 8px;
+}
+
+.mode-panel.hidden {
+  display: none;
+}
+
+.panel-section {
+  margin-bottom: 16px;
+}
+
+.panel-section:last-child {
+  margin-bottom: 0;
+}
+
+.panel-heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #556;
+  margin-bottom: 10px;
 }
 
 /* --- Grid --- */

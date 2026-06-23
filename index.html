@@ -11,8 +11,13 @@
   <div id="app">
     <header>
       <h1>Hebbiano</h1>
-      <p class="caption">Cells that fire together wire together — play some notes and watch the network learn. Click the grid to play it back.</p>
+      <p class="caption" id="caption">Cells that fire together wire together — play some notes and watch the network learn. Click the grid to play it back.</p>
     </header>
+
+    <nav id="mode-toggle">
+      <button id="mode-learn" class="mode-btn active">Learn</button>
+      <button id="mode-create" class="mode-btn">Create</button>
+    </nav>
 
     <main>
       <div id="grid-container">
@@ -26,6 +31,14 @@
         <button id="btn-demo">&#9654; Play Demo</button>
         <button id="btn-reset">&#8634; Reset Network</button>
         <button id="btn-save">&#11015; Save Snapshot</button>
+      </div>
+
+      <div id="learn-panel" class="mode-panel">
+        <!-- Populated by JS: sliders, rule selector, equation, experiments -->
+      </div>
+
+      <div id="create-panel" class="mode-panel hidden">
+        <!-- Populated by JS: temperature, cascade, auto-play, recording -->
       </div>
     </main>
 

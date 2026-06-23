@@ -103,6 +103,12 @@ var demoRunning  = false;
 var demoTimeouts = [];
 var hoverCell    = { row: -1, col: -1 };
 var keyElements  = [];
+var currentMode  = 'learn'; // 'learn' or 'create'
+
+var CAPTIONS = {
+  learn:  'Cells that fire together wire together \u2014 play some notes and watch the network learn. Click the grid to play it back.',
+  create: 'The network is your instrument \u2014 play a note and let learned connections generate melodies. Teach it patterns, then jam.'
+};
 
 // DOM references (set in init)
 var canvas, ctx, gridInfoEl;
@@ -580,6 +586,25 @@ function saveSnapshot() {
 }
 
 // ==========================================
+// MODE SWITCHING
+// ==========================================
+
+function setMode(mode) {
+  currentMode = mode;
+
+  // Toggle button active states
+  document.getElementById('mode-learn').classList.toggle('active', mode === 'learn');
+  document.getElementById('mode-create').classList.toggle('active', mode === 'create');
+
+  // Toggle panel visibility
+  document.getElementById('learn-panel').classList.toggle('hidden', mode !== 'learn');
+  document.getElementById('create-panel').classList.toggle('hidden', mode !== 'create');
+
+  // Update caption
+  document.getElementById('caption').textContent = CAPTIONS[mode];
+}
+
+// ==========================================
 // MAIN LOOP
 // ==========================================
 
@@ -618,6 +643,10 @@ function init() {
   document.getElementById('btn-demo').addEventListener('click', playDemo);
   document.getElementById('btn-reset').addEventListener('click', resetNetwork);
   document.getElementById('btn-save').addEventListener('click', saveSnapshot);
+
+  // Wire up mode toggle
+  document.getElementById('mode-learn').addEventListener('click', function () { setMode('learn'); });
+  document.getElementById('mode-create').addEventListener('click', function () { setMode('create'); });
 
   // Start animation loop
   requestAnimationFrame(tick);
