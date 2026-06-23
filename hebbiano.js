@@ -114,6 +114,12 @@ var keyElements  = [];
 var currentMode  = 'learn'; // 'learn' or 'create'
 var currentRule  = 'hebb';  // 'hebb', 'oja', or 'anti'
 
+// Generative state
+var temperature  = 1.0;
+var allowCascade = false;
+var cascadeDepth = 0;
+var MAX_CASCADE  = 4;
+
 var CAPTIONS = {
   learn:  'Cells that fire together wire together \u2014 play some notes and watch the network learn. Click the grid to play it back.',
   create: 'The network is your instrument \u2014 play a note and let learned connections generate melodies. Teach it patterns, then jam.'
@@ -182,6 +188,98 @@ function play(noteIndex) {
   }
 
   lastPlayTime[noteIndex] = currentMs;
+
+  // --- Generative Playback (Create Mode) ---
+  if (currentMode === 'create') {
+    var depth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    cascadeDepth = depth;
+    if (depth < MAX_CASCADE && (depth === 0 || allowCascade)) {
+      generateFromNote(noteIndex, depth);
+    }
+    
+    // --- Session Recording ---
+    if (sessionRecording) {
+      sessionEvents.push({
+        note: note.name,
+        noteIndex: noteIndex,
+        timeMs: Math.round(performance.now() - sessionStartTime),
+        depth: depth
+      });
+      document.querySelector('.rec-status').textContent = 'Recording... ' + sessionEvents.length + ' notes';
+    }
+  }
+}
+
+function generateFromNote(noteIndex, depth) {
+  var row = weights[noteIndex];
+  var probs = new Float64Array(N);
+  var sum = 0;
+
+  // 1. Extract weights
+  for (var j = 0; j < N; j++) {
+    probs[j] = row[j];
+    sum += probs[j];
+  }
+
+  if (sum < 0.01) return; // No strong connections to generate from
+
+  // 2. Apply temperature scaling: p' = p^(1/T)
+  var scaledSum = 0;
+  for (var j = 0; j < N; j++) {
+    if (probs[j] > 0) {
+      probs[j] = Math.pow(probs[j], 1 / temperature);
+      scaledSum += probs[j];
+    }
+  }
+
+  // 3. Normalize
+  for (var j = 0; j < N; j++) {
+    probs[j] /= scaledSum;
+  }
+
+  // 4. Determine how many notes to generate (1 to 3, depending on connection strength)
+  var numNotes = sum > 1.5 ? 3 : sum > 0.8 ? 2 : 1;
+  var generatedCount = 0;
+  
+  // 5. Sample and schedule
+  for (var attempt = 0; attempt < numNotes * 3; attempt++) {
+    if (generatedCount >= numNotes) break;
+    
+    var r = Math.random();
+    var cumulative = 0;
+    var selectedNote = -1;
+    
+    for (var j = 0; j < N; j++) {
+      cumulative += probs[j];
+      if (r <= cumulative) {
+        selectedNote = j;
+        break;
+      }
+    }
+    
+    if (selectedNote !== -1) {
+      // Temporarily clear probability so we don't pick the same note twice
+      var p = probs[selectedNote];
+      probs[selectedNote] = 0;
+      
+      // Renormalize remaining
+      var remSum = 0;
+      for (var j = 0; j < N; j++) { remSum += probs[j]; }
+      if (remSum > 0) {
+        for (var j = 0; j < N; j++) { probs[j] /= remSum; }
+      }
+      
+      // Schedule playback
+      var delayMs = 80 + Math.random() * 120 + (generatedCount * 50);
+      (function(noteToPlay, currentDepth) {
+        setTimeout(function() {
+          play(noteToPlay, currentDepth + 1);
+        }, delayMs);
+      })(selectedNote, depth);
+      
+      generatedCount++;
+    }
+  }
 }
 
 // ==========================================
@@ -971,6 +1069,201 @@ function syncRulePills() {
 }
 
 // ==========================================
+// CREATE PANEL — Generative Controls & Recording
+// ==========================================
+
+var sessionRecording = false;
+var sessionStartTime = 0;
+var sessionEvents = [];
+var autoPlayRunning = false;
+var autoPlayTimeout = null;
+
+function createCreatePanel() {
+  var panel = document.getElementById('create-panel');
+
+  // — Playback controls —
+  var playSection = document.createElement('div');
+  playSection.className = 'panel-section';
+
+  var playHeading = document.createElement('div');
+  playHeading.className = 'panel-heading';
+  playHeading.textContent = 'Generative Settings';
+  playSection.appendChild(playHeading);
+
+  // Temperature slider
+  var tempRow = document.createElement('div');
+  tempRow.className = 'slider-row';
+
+  var tempLabel = document.createElement('label');
+  tempLabel.className = 'slider-label';
+  tempLabel.textContent = 'Temperature (randomness)';
+
+  var tempVal = document.createElement('span');
+  tempVal.className = 'slider-value';
+  tempVal.textContent = temperature.toFixed(1);
+
+  var tempInput = document.createElement('input');
+  tempInput.type = 'range';
+  tempInput.className = 'slider';
+  tempInput.min = 0.1;
+  tempInput.max = 3.0;
+  tempInput.step = 0.1;
+  tempInput.value = temperature;
+
+  tempInput.addEventListener('input', function () {
+    temperature = parseFloat(this.value);
+    tempVal.textContent = temperature.toFixed(1);
+  });
+
+  tempRow.appendChild(tempLabel);
+  tempRow.appendChild(tempVal);
+  tempRow.appendChild(tempInput);
+  playSection.appendChild(tempRow);
+
+  // Cascade toggle
+  var cascadeRow = document.createElement('div');
+  cascadeRow.className = 'toggle-row';
+  
+  var cascadeLabel = document.createElement('span');
+  cascadeLabel.textContent = 'Cascade generation (notes can trigger more notes)';
+  
+  var cascadeToggle = document.createElement('input');
+  cascadeToggle.type = 'checkbox';
+  cascadeToggle.className = 'create-toggle';
+  cascadeToggle.checked = allowCascade;
+  cascadeToggle.addEventListener('change', function () {
+    allowCascade = this.checked;
+  });
+  
+  cascadeRow.appendChild(cascadeToggle);
+  cascadeRow.appendChild(cascadeLabel);
+  playSection.appendChild(cascadeRow);
+
+  // Auto-play toggle
+  var autoRow = document.createElement('div');
+  autoRow.className = 'toggle-row';
+  
+  var autoLabel = document.createElement('span');
+  autoLabel.textContent = 'Auto-play (continuous generative loop)';
+  
+  var autoToggle = document.createElement('input');
+  autoToggle.type = 'checkbox';
+  autoToggle.className = 'create-toggle';
+  autoToggle.checked = autoPlayRunning;
+  autoToggle.addEventListener('change', function () {
+    autoPlayRunning = this.checked;
+    if (autoPlayRunning) {
+      runAutoPlay();
+    } else {
+      clearTimeout(autoPlayTimeout);
+    }
+  });
+  
+  autoRow.appendChild(autoToggle);
+  autoRow.appendChild(autoLabel);
+  playSection.appendChild(autoRow);
+
+  panel.appendChild(playSection);
+
+  // — Session Recording —
+  var recSection = document.createElement('div');
+  recSection.className = 'panel-section';
+
+  var recHeading = document.createElement('div');
+  recHeading.className = 'panel-heading';
+  recHeading.textContent = 'Session Recording';
+  recSection.appendChild(recHeading);
+
+  var recControls = document.createElement('div');
+  recControls.className = 'rec-controls';
+
+  var btnRec = document.createElement('button');
+  btnRec.className = 'panel-btn rec-btn';
+  btnRec.innerHTML = '<span class="rec-dot"></span> Record';
+
+  var btnStop = document.createElement('button');
+  btnStop.className = 'panel-btn';
+  btnStop.textContent = '\u25A0 Stop';
+  btnStop.disabled = true;
+
+  var btnExport = document.createElement('button');
+  btnExport.className = 'panel-btn';
+  btnExport.textContent = '\u2193 Export JSON';
+  btnExport.disabled = true;
+
+  var recStatus = document.createElement('span');
+  recStatus.className = 'rec-status';
+  recStatus.textContent = '';
+
+  btnRec.addEventListener('click', function () {
+    sessionRecording = true;
+    sessionEvents = [];
+    sessionStartTime = performance.now();
+    btnRec.disabled = true;
+    btnRec.classList.add('recording');
+    btnStop.disabled = false;
+    btnExport.disabled = true;
+    recStatus.textContent = 'Recording...';
+  });
+
+  btnStop.addEventListener('click', function () {
+    sessionRecording = false;
+    btnRec.disabled = false;
+    btnRec.classList.remove('recording');
+    btnStop.disabled = true;
+    btnExport.disabled = sessionEvents.length === 0;
+    recStatus.textContent = sessionEvents.length + ' notes recorded';
+  });
+
+  btnExport.addEventListener('click', function () {
+    var dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(sessionEvents, null, 2));
+    var link = document.createElement('a');
+    link.href = dataStr;
+    link.download = 'hebbiano-session.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+
+  recControls.appendChild(btnRec);
+  recControls.appendChild(btnStop);
+  recControls.appendChild(btnExport);
+  recControls.appendChild(recStatus);
+  recSection.appendChild(recControls);
+
+  panel.appendChild(recSection);
+}
+
+function runAutoPlay() {
+  if (!autoPlayRunning) return;
+  
+  // Pick a semi-random note to kick off generation
+  // Biased toward notes that have connections
+  var candidates = [];
+  for (var i = 0; i < N; i++) {
+    var sum = 0;
+    for (var j = 0; j < N; j++) sum += weights[i][j];
+    if (sum > 0.1) {
+      // Weight candidate by sum
+      for (var k = 0; k < Math.max(1, Math.floor(sum * 10)); k++) {
+        candidates.push(i);
+      }
+    }
+  }
+  
+  // Fallback to purely random if network is empty
+  var noteToPlay = candidates.length > 0 
+    ? candidates[Math.floor(Math.random() * candidates.length)]
+    : Math.floor(Math.random() * N);
+    
+  play(noteToPlay);
+  
+  // Schedule next auto-play kick
+  var delay = 300 + Math.random() * 800;
+  autoPlayTimeout = setTimeout(runAutoPlay, delay);
+}
+
+// ==========================================
 // MODE SWITCHING
 // ==========================================
 
@@ -1023,6 +1316,7 @@ function init() {
   // Build UI
   createPiano();
   createLearnPanel();
+  createCreatePanel();
   setupGridInteraction();
   setupKeyboard();
   initMIDI();

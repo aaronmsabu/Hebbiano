@@ -326,6 +326,97 @@ h1 {
   margin-top: 0;
 }
 
+/* --- Create Mode Controls --- */
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #8888a0;
+}
+
+.create-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 32px;
+  height: 18px;
+  background: #1a1a28;
+  border-radius: 9px;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.2s;
+}
+
+.create-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #6a8aaa;
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.create-toggle:checked {
+  background: #2a4868;
+}
+
+.create-toggle:checked::after {
+  transform: translateX(14px);
+  background: #8ab4d0;
+}
+
+/* --- Recording --- */
+
+.rec-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rec-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #556;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.rec-btn.recording {
+  color: #d07070;
+  border-color: #603030;
+}
+
+.rec-btn.recording .rec-dot {
+  background: #e04040;
+  animation: pulse-red 1.5s infinite alternate;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 2px 0px rgba(224, 64, 64, 0.2); }
+  100% { box-shadow: 0 0 8px 2px rgba(224, 64, 64, 0.6); }
+}
+
+.rec-status {
+  font-size: 11px;
+  color: #8888a0;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+  margin-left: auto;
+}
+
 /* --- Grid --- */
 
 #grid-container {
