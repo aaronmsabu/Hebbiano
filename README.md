@@ -6,7 +6,24 @@
 
 ## What It Does
 
-A 16×16 grid of synapses represents connections between 16 chromatic notes (C4–D#5). When two notes are played close together, the synapse connecting them strengthens — a literal demonstration of Hebbian learning. Click any strengthened cell to play its two notes back, feeding into the learning loop.
+A 16×16 grid of synapses represents connections between 16 chromatic notes (C4–D#5). When two notes are played close together, the synapse connecting them strengthens.
+
+Hebbiano features two distinct modes:
+
+### 🎓 Learn Mode (Educational)
+Experiment with the mechanics of neural learning.
+- **Parameter Sliders**: Adjust learning rate (η), decay speeds, and coincidence windows in real time.
+- **Learning Rules**: Toggle between standard **Hebbian** (strengthening), **Oja's rule** (self-normalizing), and **Anti-Hebbian** (decorrelation/weakening).
+- **Live Math**: See the actual Δw equation update as you change parameters.
+- **Guided Experiments**: Try 4 built-in challenges (like "Selective Wiring" and "Decay Race") with automatic success detection.
+
+### 🎹 Create Mode (Generative)
+Use the network as a probabilistic generative instrument.
+- **Generative Playback**: Play a note, and the network will probabilistically trigger connected notes based on learned weight strengths.
+- **Temperature Control**: Slide from 0.1 (deterministic, plays only strongest links) to 3.0 (highly random/chaotic).
+- **Cascade**: Allow generated notes to trigger further generation, creating cascading melodies.
+- **Auto-Play**: Starts a continuous loop where the network plays itself and learns from its own output.
+- **Session Recording**: Record everything that plays and export the event data to a `.json` file for use elsewhere.
 
 ## Quick Start
 
@@ -26,32 +43,6 @@ Black keys:  W  E     T  Y  U     O  P
 White keys: A  S  D  F  G  H  J  K  L
             C  D  E  F  G  A  B  C  D
             ←——— Octave 4 ———→  ←— 5 —→
-```
-
-## Controls
-
-| Button | Action |
-|--------|--------|
-| ▶ Play Demo | Runs a scripted sequence of 3 chord progressions |
-| ↺ Reset Network | Zeros all weights instantly |
-| ⬇ Save Snapshot | Exports the grid as a PNG |
-
-## How It Works
-
-- **Activity trace**: Each note maintains a decaying activation signal (`SHORT_DECAY = 0.95` per frame)
-- **Learning rule**: `w[i][j] += η × activity[i] × activity[j]` each frame, clamped to [0, 1]
-- **Long-term decay**: `w[i][j] *= 0.9998` per frame (~58s half-life) — patterns persist ~60s then fade
-- **Pulse animation**: Coincident notes (within 600ms) trigger expanding ring animations on the grid
-
-## Tuning
-
-Constants are at the top of `hebbiano.js`:
-
-```javascript
-const ETA         = 0.015;   // Learning rate
-const SHORT_DECAY = 0.95;    // Activity decay per frame
-const LONG_DECAY  = 0.9998;  // Weight decay per frame
-const COINCIDENCE_WINDOW = 600; // ms
 ```
 
 ## Tech Stack
