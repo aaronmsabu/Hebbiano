@@ -116,6 +116,7 @@ var currentRule  = 'hebb';  // 'hebb', 'oja', or 'anti'
 
 // Generative state
 var temperature  = 1.0;
+var tempoBpm     = 120;
 var allowCascade = false;
 var cascadeDepth = 0;
 var MAX_CASCADE  = 4;
@@ -269,8 +270,9 @@ function generateFromNote(noteIndex, depth) {
         for (var j = 0; j < N; j++) { probs[j] /= remSum; }
       }
       
-      // Schedule playback
-      var delayMs = 80 + Math.random() * 120 + (generatedCount * 50);
+      // Schedule playback (steady 8th notes based on tempo)
+      var eighthNoteMs = 30000 / tempoBpm;
+      var delayMs = eighthNoteMs * (generatedCount + 1);
       (function(noteToPlay, currentDepth) {
         setTimeout(function() {
           play(noteToPlay, currentDepth + 1);
@@ -1120,6 +1122,36 @@ function createCreatePanel() {
   tempRow.appendChild(tempInput);
   playSection.appendChild(tempRow);
 
+  // Tempo slider
+  var bpmRow = document.createElement('div');
+  bpmRow.className = 'slider-row';
+
+  var bpmLabel = document.createElement('label');
+  bpmLabel.className = 'slider-label';
+  bpmLabel.textContent = 'Tempo (BPM)';
+
+  var bpmVal = document.createElement('span');
+  bpmVal.className = 'slider-value';
+  bpmVal.textContent = tempoBpm;
+
+  var bpmInput = document.createElement('input');
+  bpmInput.type = 'range';
+  bpmInput.className = 'slider';
+  bpmInput.min = 60;
+  bpmInput.max = 240;
+  bpmInput.step = 1;
+  bpmInput.value = tempoBpm;
+
+  bpmInput.addEventListener('input', function () {
+    tempoBpm = parseInt(this.value, 10);
+    bpmVal.textContent = tempoBpm;
+  });
+
+  bpmRow.appendChild(bpmLabel);
+  bpmRow.appendChild(bpmVal);
+  bpmRow.appendChild(bpmInput);
+  playSection.appendChild(bpmRow);
+
   // Cascade toggle
   var cascadeRow = document.createElement('div');
   cascadeRow.className = 'toggle-row';
@@ -1258,9 +1290,9 @@ function runAutoPlay() {
     
   play(noteToPlay);
   
-  // Schedule next auto-play kick
-  var delay = 300 + Math.random() * 800;
-  autoPlayTimeout = setTimeout(runAutoPlay, delay);
+  // Schedule next auto-play kick (steady quarter notes based on tempo)
+  var quarterNoteMs = 60000 / tempoBpm;
+  autoPlayTimeout = setTimeout(runAutoPlay, quarterNoteMs);
 }
 
 // ==========================================
