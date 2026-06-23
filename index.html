@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hebbiano — Hebbian Learning Visualizer</title>
+  <meta name="description" content="Interactive visualization of Hebbian learning: play music on a piano and watch a neural network rewire itself in real time. Click the grid to play it back.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Hebbiano</h1>
+      <p class="caption">Cells that fire together wire together — play some notes and watch the network learn. Click the grid to play it back.</p>
+    </header>
+
+    <main>
+      <div id="grid-container">
+        <canvas id="grid"></canvas>
+        <div id="grid-info">&nbsp;</div>
+      </div>
+
+      <div id="piano"></div>
+
+      <div id="controls">
+        <button id="btn-demo">&#9654; Play Demo</button>
+        <button id="btn-reset">&#8634; Reset Network</button>
+        <button id="btn-save">&#11015; Save Snapshot</button>
+      </div>
+    </main>
+
+    <footer>
+      <span id="midi-status"></span>
+      <span class="attribution">Based on Hebb's rule (1949)</span>
+    </footer>
+  </div>
+
+  <script src="hebbiano.js" defer></script>
+</body>
+</html>
