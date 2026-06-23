@@ -773,6 +773,9 @@ function createLearnPanel() {
   eqSection.appendChild(eqDisplay);
 
   panel.appendChild(eqSection);
+
+  // Add experiments UI
+  createExperimentsUI();
 }
 
 // --- Equation update (called each frame) ---
@@ -798,6 +801,172 @@ function updateEquation() {
     eqEl.innerHTML = '<div class="eq-formula">' + formula + '</div>' +
                      '<div class="eq-detail">' + detail + '</div>';
     lastEquationText = text;
+  }
+}
+
+// ==========================================
+// GUIDED EXPERIMENTS
+// ==========================================
+
+var EXPERIMENTS = [
+  {
+    id: 'chord',
+    name: 'Chord Memory',
+    instruction: 'Play C\u2013E\u2013G together 5 times. Watch the triangle of connections form.',
+    setup: function () { currentRule = 'hebb'; syncRulePills(); },
+    check: function () {
+      return weights[0][4] > 0.5 && weights[0][7] > 0.5 && weights[4][7] > 0.5;
+    }
+  },
+  {
+    id: 'selective',
+    name: 'Selective Wiring',
+    instruction: 'Wire D\u2013F# without any other connection going above 0.3. Play only those two notes.',
+    setup: function () { currentRule = 'hebb'; syncRulePills(); },
+    check: function () {
+      if (weights[2][6] < 0.5) return false; // D-F# must be strong
+      for (var i = 0; i < N; i++) {
+        for (var j = i + 1; j < N; j++) {
+          if (i === 2 && j === 6) continue;
+          if (weights[i][j] > 0.3) return false;
+        }
+      }
+      return true;
+    }
+  },
+  {
+    id: 'decay',
+    name: 'Decay Race',
+    instruction: 'Teach C\u2013E (play 6\u00D7), then F\u2013A (play 3\u00D7). Watch which fades first!',
+    setup: function () { currentRule = 'hebb'; syncRulePills(); },
+    check: function () {
+      // Complete when both patterns have been taught (both > 0.3)
+      return weights[0][4] > 0.3 && weights[5][9] > 0.15;
+    }
+  },
+  {
+    id: 'antierase',
+    name: 'Anti-Learning',
+    instruction: 'First teach C\u2013E\u2013G (Hebbian), then switch to Anti-Hebbian and erase it.',
+    setup: function () { currentRule = 'hebb'; syncRulePills(); },
+    check: function () {
+      // Succeeds when a previously strong connection is erased
+      return currentRule === 'anti' &&
+             weights[0][4] < 0.1 && weights[0][7] < 0.1 && weights[4][7] < 0.1;
+    }
+  }
+];
+
+var activeExperiment = null; // index into EXPERIMENTS, or null
+var experimentCompleted = {}; // id → true
+var experimentStatusEls = {}; // id → status element
+
+function createExperimentsUI() {
+  var panel = document.getElementById('learn-panel');
+
+  var section = document.createElement('div');
+  section.className = 'panel-section';
+
+  var heading = document.createElement('div');
+  heading.className = 'panel-heading';
+  heading.textContent = 'Guided Experiments';
+  section.appendChild(heading);
+
+  EXPERIMENTS.forEach(function (exp, idx) {
+    var card = document.createElement('div');
+    card.className = 'experiment-card';
+    card.id = 'exp-' + exp.id;
+
+    var header = document.createElement('div');
+    header.className = 'exp-header';
+
+    var title = document.createElement('span');
+    title.className = 'exp-title';
+    title.textContent = (idx + 1) + '. ' + exp.name;
+
+    var status = document.createElement('span');
+    status.className = 'exp-status';
+    status.id = 'exp-status-' + exp.id;
+    experimentStatusEls[exp.id] = status;
+
+    header.appendChild(title);
+    header.appendChild(status);
+
+    var instEl = document.createElement('div');
+    instEl.className = 'exp-instruction';
+    instEl.textContent = exp.instruction;
+
+    var startBtn = document.createElement('button');
+    startBtn.className = 'panel-btn exp-start';
+    startBtn.textContent = 'Start';
+    startBtn.addEventListener('click', function () {
+      startExperiment(idx);
+    });
+
+    card.appendChild(header);
+    card.appendChild(instEl);
+    card.appendChild(startBtn);
+    section.appendChild(card);
+  });
+
+  panel.appendChild(section);
+}
+
+function startExperiment(idx) {
+  // Reset network
+  resetNetwork();
+  activeExperiment = idx;
+  var exp = EXPERIMENTS[idx];
+  if (exp.setup) exp.setup();
+
+  // Update all experiment status indicators
+  EXPERIMENTS.forEach(function (e) {
+    var el = experimentStatusEls[e.id];
+    if (el) {
+      if (e === exp) {
+        el.textContent = '\u25CF active';
+        el.className = 'exp-status active';
+      } else if (experimentCompleted[e.id]) {
+        el.textContent = '\u2713';
+        el.className = 'exp-status completed';
+      } else {
+        el.textContent = '';
+        el.className = 'exp-status';
+      }
+    }
+  });
+}
+
+function checkExperiments() {
+  if (activeExperiment === null) return;
+  var exp = EXPERIMENTS[activeExperiment];
+  if (exp.check && exp.check()) {
+    experimentCompleted[exp.id] = true;
+    activeExperiment = null;
+    var el = experimentStatusEls[exp.id];
+    if (el) {
+      el.textContent = '\u2713 Complete!';
+      el.className = 'exp-status completed';
+    }
+    // Brief highlight on the card
+    var card = document.getElementById('exp-' + exp.id);
+    if (card) {
+      card.classList.add('success');
+      setTimeout(function () { card.classList.remove('success'); }, 1500);
+    }
+  }
+}
+
+function syncRulePills() {
+  var pills = document.querySelectorAll('.rule-pill');
+  pills.forEach(function (p) {
+    p.classList.toggle('active', p.dataset.rule === currentRule);
+  });
+  // Update description
+  var desc = document.getElementById('rule-desc');
+  if (desc) {
+    var RULE_DESCS = { hebb: 'Connections strengthen when notes co-occur', oja: 'Self-normalizing \u2014 prevents saturation', anti: 'Connections weaken when notes co-occur' };
+    desc.textContent = RULE_DESCS[currentRule] || '';
   }
 }
 
@@ -830,6 +999,7 @@ function tick() {
   updatePianoHighlights();
   updateGridInfo();
   updateEquation();
+  checkExperiments();
   requestAnimationFrame(tick);
 }
 
