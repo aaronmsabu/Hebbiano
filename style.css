@@ -209,6 +209,67 @@ h1 {
   color: #8888b0;
 }
 
+/* --- Rule Selector --- */
+
+.rule-selector {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.rule-pill {
+  background: #141420;
+  color: #6668a0;
+  border: 1px solid #252530;
+  padding: 5px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.rule-pill:hover {
+  background: #1a1a2e;
+  color: #8888b0;
+}
+
+.rule-pill.active {
+  background: #1e2e48;
+  color: #8ab4d0;
+  border-color: #2a4868;
+}
+
+.rule-desc {
+  font-size: 11px;
+  color: #4a5568;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* --- Equation Display --- */
+
+.equation-display {
+  background: #0a0a12;
+  border: 1px solid #1a1a24;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+
+.eq-formula {
+  font-size: 14px;
+  color: #8ab4d0;
+  margin-bottom: 4px;
+  letter-spacing: 0.03em;
+}
+
+.eq-detail {
+  font-size: 10px;
+  color: #4a5568;
+  letter-spacing: 0.02em;
+}
+
 /* --- Grid --- */
 
 #grid-container {

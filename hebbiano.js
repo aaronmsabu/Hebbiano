@@ -112,6 +112,7 @@ var demoTimeouts = [];
 var hoverCell    = { row: -1, col: -1 };
 var keyElements  = [];
 var currentMode  = 'learn'; // 'learn' or 'create'
+var currentRule  = 'hebb';  // 'hebb', 'oja', or 'anti'
 
 var CAPTIONS = {
   learn:  'Cells that fire together wire together \u2014 play some notes and watch the network learn. Click the grid to play it back.',
@@ -188,15 +189,34 @@ function play(noteIndex) {
 // ==========================================
 
 function update() {
-  var i, j;
+  var i, j, dw;
 
-  // Hebbian learning rule + long-term decay + clamping
+  // Learning rule + long-term decay + clamping
   for (i = 0; i < N; i++) {
     for (j = i + 1; j < N; j++) {
-      weights[i][j] += ETA * activity[i] * activity[j];
+      // Compute weight delta based on active learning rule
+      switch (currentRule) {
+        case 'hebb':
+          // Standard Hebbian: Δw = η · aᵢ · aⱼ
+          dw = ETA * activity[i] * activity[j];
+          break;
+        case 'oja':
+          // Oja's rule: Δw = η · aᵢ · (aⱼ − w · aᵢ)  — self-normalizing
+          dw = ETA * activity[i] * (activity[j] - weights[i][j] * activity[i]);
+          break;
+        case 'anti':
+          // Anti-Hebbian: Δw = −η · aᵢ · aⱼ  — decorrelation
+          dw = -ETA * activity[i] * activity[j];
+          break;
+        default:
+          dw = ETA * activity[i] * activity[j];
+      }
+
+      weights[i][j] += dw;
       weights[i][j] *= LONG_DECAY;
       if (weights[i][j] > 1) weights[i][j] = 1;
-      if (weights[i][j] < 1e-6) weights[i][j] = 0; // Snap near-zero to zero
+      if (weights[i][j] < 0) weights[i][j] = 0;
+      if (weights[i][j] < 1e-6) weights[i][j] = 0; // Snap near-zero
       weights[j][i] = weights[i][j]; // Mirror — symmetric matrix
     }
   }
@@ -694,6 +714,91 @@ function createLearnPanel() {
   section.appendChild(resetBtn);
 
   panel.appendChild(section);
+
+  // — Learning rule selector section —
+  var ruleSection = document.createElement('div');
+  ruleSection.className = 'panel-section';
+
+  var ruleHeading = document.createElement('div');
+  ruleHeading.className = 'panel-heading';
+  ruleHeading.textContent = 'Learning Rule';
+  ruleSection.appendChild(ruleHeading);
+
+  var RULES = [
+    { key: 'hebb', label: 'Hebbian',       desc: 'Connections strengthen when notes co-occur' },
+    { key: 'oja',  label: 'Oja\u2019s',    desc: 'Self-normalizing \u2014 prevents saturation' },
+    { key: 'anti', label: 'Anti-Hebbian',   desc: 'Connections weaken when notes co-occur' },
+  ];
+
+  var ruleContainer = document.createElement('div');
+  ruleContainer.className = 'rule-selector';
+
+  var ruleDesc = document.createElement('div');
+  ruleDesc.className = 'rule-desc';
+  ruleDesc.id = 'rule-desc';
+  ruleDesc.textContent = RULES[0].desc;
+
+  RULES.forEach(function (rule) {
+    var btn = document.createElement('button');
+    btn.className = 'rule-pill' + (rule.key === currentRule ? ' active' : '');
+    btn.textContent = rule.label;
+    btn.dataset.rule = rule.key;
+    btn.addEventListener('click', function () {
+      currentRule = rule.key;
+      // Update active pill
+      ruleContainer.querySelectorAll('.rule-pill').forEach(function (p) {
+        p.classList.toggle('active', p.dataset.rule === rule.key);
+      });
+      ruleDesc.textContent = rule.desc;
+    });
+    ruleContainer.appendChild(btn);
+  });
+
+  ruleSection.appendChild(ruleContainer);
+  ruleSection.appendChild(ruleDesc);
+  panel.appendChild(ruleSection);
+
+  // — Live equation display section —
+  var eqSection = document.createElement('div');
+  eqSection.className = 'panel-section';
+
+  var eqHeading = document.createElement('div');
+  eqHeading.className = 'panel-heading';
+  eqHeading.textContent = 'Active Equation';
+  eqSection.appendChild(eqHeading);
+
+  var eqDisplay = document.createElement('div');
+  eqDisplay.className = 'equation-display';
+  eqDisplay.id = 'equation-display';
+  eqSection.appendChild(eqDisplay);
+
+  panel.appendChild(eqSection);
+}
+
+// --- Equation update (called each frame) ---
+var EQUATION_TEMPLATES = {
+  hebb: '\u0394w = \u03B7 \u00D7 a\u1D62 \u00D7 a\u2C7C',
+  oja:  '\u0394w = \u03B7 \u00D7 a\u1D62 \u00D7 (a\u2C7C \u2212 w \u00D7 a\u1D62)',
+  anti: '\u0394w = \u2212\u03B7 \u00D7 a\u1D62 \u00D7 a\u2C7C',
+};
+
+var lastEquationText = '';
+
+function updateEquation() {
+  var eqEl = document.getElementById('equation-display');
+  if (!eqEl) return;
+
+  var formula = EQUATION_TEMPLATES[currentRule] || EQUATION_TEMPLATES.hebb;
+  var detail = '\u03B7 = ' + ETA.toFixed(3) +
+               '    decay: ' + SHORT_DECAY.toFixed(2) +
+               '/frame    weight decay: ' + LONG_DECAY.toFixed(4) + '/frame';
+  var text = formula + '\n' + detail;
+
+  if (text !== lastEquationText) {
+    eqEl.innerHTML = '<div class="eq-formula">' + formula + '</div>' +
+                     '<div class="eq-detail">' + detail + '</div>';
+    lastEquationText = text;
+  }
 }
 
 // ==========================================
@@ -724,6 +829,7 @@ function tick() {
   render();
   updatePianoHighlights();
   updateGridInfo();
+  updateEquation();
   requestAnimationFrame(tick);
 }
 
